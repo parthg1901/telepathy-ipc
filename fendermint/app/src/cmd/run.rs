@@ -4,6 +4,7 @@
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
+use fendermint_actor_customsyscall::State;
 use fendermint_app::events::{ParentFinalityVoteAdded, ParentFinalityVoteIgnored};
 use fendermint_app::ipc::{AppParentFinalityQuery, AppVote};
 use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
@@ -11,13 +12,14 @@ use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
 use fendermint_tracing::emit;
+use fendermint_vm_actor_interface::customsyscall::CUSTOMSYSCALL_ACTOR_ID;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::chain::ChainEnv;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
     chain::{ChainMessageInterpreter, CheckpointPool},
-    fvm::{Broadcaster, FvmMessageInterpreter, ValidatorContext},
+    fvm::{Broadcaster, FvmMessageInterpreter, ValidatorContext, upgrades::Upgrade, state::FvmExecState},
     signed::SignedMessageInterpreter,
 };
 use fendermint_vm_resolver::ipld::IpldResolver;
@@ -26,13 +28,18 @@ use fendermint_vm_topdown::proxy::IPCProviderProxy;
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
+use fvm_ipld_encoding::CborStore;
 use fvm_shared::address::{current_network, Address, Network};
+use fvm::state_tree::{ActorState};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
 use libp2p::identity::secp256k1;
 use libp2p::identity::Keypair;
+use multihash::Code;
+use regex::Regex;
 use std::sync::Arc;
+use std::env;
 use tokio::sync::broadcast::error::RecvError;
 use tower::ServiceBuilder;
 use tracing::info;
@@ -54,6 +61,59 @@ namespaces! {
         state_store,
         bit_store
     }
+}
+
+pub fn patch_actor_state_func(state: &mut FvmExecState<NamespaceBlockstore>) -> anyhow::Result<()> {
+    let state_tree = state.state_tree_mut();
+
+    // get the ActorState from the state tree
+    //
+    let actor_state = match state_tree.get_actor(CUSTOMSYSCALL_ACTOR_ID)? {
+        Some(actor) => actor,
+        None => {
+            return Err(anyhow!("customsyscall actor not found"));
+        }
+    };
+    println!(
+        "customsyscall code_cid: {:?}, state_cid: {:?}",
+        actor_state.code, actor_state.state
+    );
+
+    // retrieve the customsyscall actor state from the blockstore
+    //
+    let mut customsyscall_state: State = match state_tree.store().get_cbor(&actor_state.state)? {
+        Some(v) => v,
+        None => return Err(anyhow!("custom syscall actor state not found")),
+    };
+    println!(
+        "customsyscall lives: {}",
+        customsyscall_state.lives
+    );
+
+    if customsyscall_state.lives < 4 {
+        customsyscall_state.lives += 1;
+    };
+
+    let new_state_cid = state_tree
+        .store()
+        .put_cbor(&customsyscall_state, Code::Blake2b256)
+        .map_err(|e| anyhow!("failed to put custom syscall actor state: {}", e))?;
+    println!("new customsyscall state_cid: {:?}", new_state_cid);
+
+    // next we update the actor state in the state tree
+    //
+    state_tree.set_actor(
+        CUSTOMSYSCALL_ACTOR_ID,
+        ActorState {
+            code: actor_state.code,
+            state: new_state_cid,
+            sequence: actor_state.sequence,
+            balance: actor_state.balance,
+            delegated_address: actor_state.delegated_address,
+        },
+    );
+
+    Ok(())
 }
 
 /// Run the Fendermint ABCI Application.
@@ -129,6 +189,17 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         other => other,
     };
 
+    let mut scheduler = UpgradeScheduler::new();
+    if let Some(val) = env::var("FM_CHAIN_NAME").ok() {
+        for i in 1..100 {
+            let re = Regex::new(r"^(r\d+)-t").unwrap();
+            let output = re.replace(&(val).as_str(), "/$1/t");
+            println!("Value of FM_CHAIN_NAME: {}", output.clone());
+            let upgrade = Upgrade::new(output, 2000*i, None, patch_actor_state_func);
+            let _ = scheduler.add(upgrade?);
+        }
+    }
+
     let interpreter = FvmMessageInterpreter::<NamespaceBlockstore, _>::new(
         tendermint_client.clone(),
         validator_ctx,
@@ -136,7 +207,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         settings.fvm.gas_overestimation_rate,
         settings.fvm.gas_search_step,
         settings.fvm.exec_in_check,
-        UpgradeScheduler::new(),
+        scheduler,
     )
     .with_push_chain_meta(testing_settings.map_or(true, |t| t.push_chain_meta));
 

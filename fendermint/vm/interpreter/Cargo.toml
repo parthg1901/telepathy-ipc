@@ -23,6 +23,7 @@ fendermint_rpc = { path = "../../rpc" }
 fendermint_tracing = { path = "../../tracing" }
 fendermint_actors = { path = "../../actors" }
 fendermint_actor_chainmetadata = { path = "../../actors/chainmetadata" }
+fendermint_actor_customsyscall = { path = "../../actors/customsyscall" }
 fendermint_actor_eam = { workspace = true }
 fendermint_testing = { path = "../../testing", optional = true }
 ipc_actors_abis = { workspace = true }
@@ -57,10 +58,11 @@ tokio = { workspace = true }
 pin-project = { workspace = true }
 tokio-stream = { workspace = true }
 tokio-util = { workspace = true }
+ambassador = { workspace = true }
 
 arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }
-rand = { workspace = true, optional = true }
+rand = { workspace = true }
 
 [dev-dependencies]
 quickcheck = { workspace = true }
@@ -81,5 +83,4 @@ arb = [
     "quickcheck",
     "fvm_shared/arb",
     "fendermint_testing/arb",
-    "rand",
 ]

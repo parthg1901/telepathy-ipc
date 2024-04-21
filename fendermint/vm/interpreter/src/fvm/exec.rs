@@ -3,9 +3,10 @@
 
 use anyhow::Context;
 use async_trait::async_trait;
+use fendermint_actor_customsyscall::SenseiParams;
 use std::collections::HashMap;
 
-use fendermint_vm_actor_interface::{chainmetadata, cron, system};
+use fendermint_vm_actor_interface::{chainmetadata, cron, customsyscall, system};
 use fvm::executor::ApplyRet;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, ActorID, MethodNum, BLOCK_GAS_LIMIT};
@@ -129,8 +130,37 @@ where
                 if let Some(err) = apply_ret.failure_info {
                     anyhow::bail!("failed to apply chainmetadata message: {}", err);
                 }
+
+                println!("customsyscall actor returned: {}", fendermint_actor_customsyscall::Method::Gen as u64);
+                println!("customsyscall actor returned: {}", fendermint_actor_customsyscall::Method::Sensei as u64);
+                println!("customsyscall actor returned: {}", fendermint_actor_customsyscall::Method::GetLives as u64);
             }
         }
+
+        // if block_height == (1 as u64) {
+        //     let msg = FvmMessage {
+        //         from: system::SYSTEM_ACTOR_ADDR,
+        //         to: customsyscall::CUSTOMSYSCALL_ACTOR_ADDR,
+        //         sequence: height as u64,
+        //         gas_limit,
+        //         method_num: fendermint_actor_customsyscall::Method::Gen as u64,
+        //         params: Default::default(),
+        //         value: Default::default(),
+        //         version: Default::default(),
+        //         gas_fee_cap: Default::default(),
+        //         gas_premium: Default::default(),
+        //     };
+
+        //     let (apply_ret, _) = state.execute_implicit(msg)?;
+
+        //     if let Some(err) = apply_ret.failure_info {
+        //         anyhow::bail!("failed to apply customsyscall message: {}", err);
+        //     }
+
+        //     let val: fendermint_actor_customsyscall::State = apply_ret.msg_receipt.return_data.deserialize().unwrap();
+        //     println!("customsyscall actor returned: {:?}", val);
+
+        // }
 
         let ret = FvmApplyRet {
             apply_ret,

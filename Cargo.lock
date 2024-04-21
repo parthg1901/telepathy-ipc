@@ -2815,6 +2815,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_customsyscall"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid",
+ "fil_actors_runtime",
+ "frc42_dispatch",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_sdk",
+ "fvm_shared",
+ "num-derive 0.3.3",
+ "num-traits",
+ "serde",
+ "serde_tuple",
+]
+
+[[package]]
 name = "fendermint_actor_eam"
 version = "0.1.0"
 dependencies = [
@@ -2842,6 +2860,7 @@ dependencies = [
  "anyhow",
  "cid",
  "fendermint_actor_chainmetadata",
+ "fendermint_actor_customsyscall",
  "fendermint_actor_eam",
  "fil_actor_bundler",
  "fil_actors_runtime",
@@ -2860,6 +2879,7 @@ dependencies = [
  "bytes",
  "cid",
  "fendermint_abci",
+ "fendermint_actor_customsyscall",
  "fendermint_app_options",
  "fendermint_app_settings",
  "fendermint_crypto",
@@ -2895,6 +2915,7 @@ dependencies = [
  "libp2p-bitswap",
  "literally",
  "multiaddr",
+ "multihash 0.18.1",
  "num-traits",
  "openssl",
  "paste",
@@ -2904,6 +2925,7 @@ dependencies = [
  "quickcheck",
  "quickcheck_macros",
  "rand_chacha",
+ "regex",
  "serde",
  "serde_json",
  "serde_with 2.3.3",
@@ -3306,6 +3328,7 @@ dependencies = [
 name = "fendermint_vm_interpreter"
 version = "0.1.0"
 dependencies = [
+ "ambassador",
  "anyhow",
  "arbitrary",
  "async-stm",
@@ -3313,6 +3336,7 @@ dependencies = [
  "cid",
  "ethers",
  "fendermint_actor_chainmetadata",
+ "fendermint_actor_customsyscall",
  "fendermint_actor_eam",
  "fendermint_actors",
  "fendermint_crypto",

@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::Ok;
 use cid::Cid;
+use crate::fvm::customsyscalls::mycustomkernel::CustomKernelImpl;
 use fendermint_vm_genesis::PowerScale;
 use fvm::{
     call_manager::DefaultCallManager,
@@ -12,7 +13,6 @@ use fvm::{
     executor::{ApplyFailure, ApplyKind, ApplyRet, DefaultExecutor, Executor},
     machine::{DefaultMachine, Machine, Manifest, NetworkConfig},
     state_tree::StateTree,
-    DefaultKernel,
 };
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
@@ -97,7 +97,7 @@ where
 {
     #[allow(clippy::type_complexity)]
     executor: DefaultExecutor<
-        DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
+        CustomKernelImpl<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
     >,
 
     /// Hash of the block currently being executed. For queries and checks this is empty.
